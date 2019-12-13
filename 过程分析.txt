@@ -1,0 +1,239 @@
+
+首先新建根实例rootInstantce（最外层容器） 
+{
+    this._internalRoot = root;
+    render(childern){
+
+    }
+}
+其中root是容器对应的react对象
+root = {
+      current: uninitializedFiber,
+      containerInfo: containerInfo, // dom节点
+}
+其中uninitializedFiber是root对应的fiber对象
+{
+    tag: 3  // hostroot
+    mode: nocontext,
+    stateNode: root,
+    elementType: 组件信息（eg: Main函数组件）
+}
+react对象和fiber对象互相引用
+container._reactRootContainer=rootclass
+
+然后执行根实例的render方法渲染所有子节点
+首先创建reactwork
+{
+    this._callbacks = null;
+    this._didCommit = false;
+    then(onCommit){
+
+    }
+    _oncommit(){
+
+    }
+}
+然后执行 updateContainer(children, root, null, reactwork._onCommit);
+updateContainerAtExpirationTime(element, container, parentComponent, expirationTime)  // 此container是react对象root
+开始处理容器fiber节点  scheduleRootUpdate(current$$1, element, expirationTime); // current$$1 是fiber对象（root.current）
+创建update = {
+    expirationTime: expirationTime,
+    payload = { element: element }
+    tag: UpdateState,
+    payload: null,
+    callback: null,
+    next: null,
+    nextEffect: null
+  }
+  并将update插入容器fiber的updatequeue, 同时fiber.alternate引用同一个updatequeue
+  scheduleWork(current$$1, expirationTime);
+  requestWork(root, expirationTime)  // root是react对象
+  performWork(Sync, false)
+  performWorkOnRoot(root, expirationTime, false)
+  renderRoot(root, false)
+  重置工作栈，创建下一工作单元WorkInProgress，即current.alternate（复制current的fiber） nextUnitOfWork = createWorkInProgress(nextRoot.current, null, nextRenderExpirationTime)
+  获取下一个工作单元（容器fiber对应的workinprogress）后，开始 Reconciliation，重复执行 performUnitOfWork(workInProgress)，直至下一工作单元不存在
+  将全局变量current赋值为当前工作单元workInProgress
+  获取下一工作单元 next = beginWork(current$$1, workInProgress, nextRenderExpirationTime);
+  updateHostRoot(current$$1, workInProgress, renderExpirationTime)
+  处理当前工作单元的updatequeue processUpdateQueue(workInProgress, updateQueue, nextProps, null, renderExpirationTime)
+  处理完updatequeue后的最新state存入fiber对象的memoizedState,并且current置空  workInProgress.memoizedProps = workInProgress.pendingProps;
+  接下来处理子节点 reconcileChildren(current$$1, workInProgress, nextChildren, renderExpirationTime)
+  workInProgress.child = reconcileChildFibers(workInProgress, current$$1.child, nextChildren, renderExpirationTime); // nextChildren是容器的子节点element
+  创建子节点对应的fiber挂载到workInProgress.child并作为下一工作单元返回，重新执行performUnitOfWork  reconcileSingleElement(returnFiber, currentFirstChild, newChild, expirationTime) // returnfiber是容器对应的工作单元 newchild是element
+  // 以下是处理自定义函数组件Main
+  mountIndeterminateComponent(current$$1, workInProgress, elementType, renderExpirationTime) // elementType是自定义组件信息，此时current$$1为空
+  执行函数组件返回子节点 renderWithHooks(null, workInProgress, Component, props, context, renderExpirationTime)
+  获取到子节点后执行 reconcileChildren(null, workInProgress, value, renderExpirationTime);  // value 是执行函数组件的返回值（p标签，内容hello作为prop传入）
+  workInProgress.child = mountChildFibers(workInProgress, null, nextChildren, renderExpirationTime)  // nextChildren 是执行函数组件的返回值
+  创建子节点对应的fiber挂载到workInProgress.child并作为下一工作单元返回
+  p作为当前工作单元没有子节点了，处理完即将进入commit
+  onComplete(root, rootWorkInProgress, expirationTime)  // rootWorkInProgress = root.current.alternate
+  将处理完的容器workinprogress挂载到容器react对象上   root.finishedWork = finishedWork  // finishedWork = root.current.alternate
+  completeRoot(root, finishedWork, expirationTime)
+  commitRoot(root, finishedWork)  // 此时finishwork的effectlist只包括子节点的effect，所以还应把自己加上effectlist最后
+  prepareForCommit(containerInfo) // containerInfo是容器dom节点
+  commit分两个阶段：
+  1. commitAllHostEffects()
+  2. commitLifeCycles
+  commitUpdateQueue(finishedWork, _updateQueue, _instance, committedExpirationTime)
+  commitUpdateEffects(finishedQueue.firstEffect, instance);
+
+  onCommitRoot(finishedWork.stateNode)
+  最后 hook.onCommitFiberRoot(rendererID, root)
+
+  流程
+  ReactDom.render 
+  -> legacyRenderSubtreeIntoContainer  // new ReactRoot创建根实例root, 初始化react对象和fiber对象
+  -> root.render  // new ReactWork创建work实例，work._onCommit作为callback向下传参
+  -> updateContainer  // 计算expirationTime向下传参
+  -> updateContainerAtExpirationTime  // 获取current$$1：container.current(fiber)向下传参
+  -> scheduleRootUpdate  // 创建插入main组件和挂载callback的update，并将此update插入current$$1的updatequeue
+  -> scheduleWork  // 获取current$$1的statenode对象向下传参
+  -> requestWork  // 判断同步处理 expirationTime === Sync
+  -> performSyncWork
+  -> performWork
+  -> performWorkOnRoot
+  -> renderRoot  // 创建下一工作单元nextUnitOfWork
+  -> workLoop  // 开始进入工作循环
+  循环体，首次执行，workinprogress是容器fiber
+  -> performUnitOfWork // 1. 循环体，返回下一工作单元，重复执行  2. 设置全局变量current为当前工作单元
+  -> beginwork  // 根据不同的workInProgress.tag，执行不同的方法
+  -> updateHostRoot  // 1. HostRoot 根容器 2.遍历执行processUpdateQueue，获取main组件
+  -> mountChildFibers(ChildReconciler)  // 判断main组件的类型newChild.$$typeof
+  -> reconcileSingleElement  // REACT_ELEMENT_TYPE 创建main组件的fiber节点返回
+  -> placeSingleChild  // 设置effecttag为插入 newFiber.effectTag = Placement，返回新fiber, fiber不为空回到workLoop，重复执行performUnitOfWork
+  二次执行，workinprogress是main组件对应的fiber
+  -> performUnitOfWork // 1. 循环体，返回下一工作单元，重复执行  2. 设置全局变量current为当前工作单元
+  -> beginwork // 1.根据不同的workInProgress.tag，执行不同的方法将自定义组件体 2. workInProgress.elementType 向下传参
+  -> mountIndeterminateComponent // 1. IndeterminateComponent 自定义组件 2. renderWithHooks获取自定义组件体的返回值作为子节点向下传参
+  -> reconcileChildren 
+  -> mountChildFibers(ChildReconciler)  // 判断子节点类型newChild.$$typeof
+  -> reconcileSingleElement  // REACT_ELEMENT_TYPE 创建fiber节点返回
+  -> placeSingleChild  // 设置effecttag为插入 newFiber.effectTag = Placement，返回新fiber, fiber不为空回到workLoop，重复执行performUnitOfWork
+  三次执行，workinprogress是main组件的返回值 <div>...</div>
+  -> performUnitOfWork // 1. 循环体，返回下一工作单元，重复执行  2. 设置全局变量current为当前工作单元
+  -> beginwork   // 根据不同的workInProgress.tag，执行不同的方法
+  -> updateHostComponent  // 1. HostComponent 内置标签 2. 获取当前工作节点的nextChildren = workInProgress.pendingProps.children向下传参, 结果是一个列表 ['p', 'button']
+  -> reconcileChildren   
+  -> mountChildFibers(ChildReconciler)  // 判断子节点类型newChild.$$typeof
+  -> reconcileChildrenArray  // newChild是一个列表，遍历创建各自对应的fiber节点以sibling引用，返回第一个元素p对应的fiber节点, fiber不为空回到workLoop，重复执行performUnitOfWork
+  四次执行，workinprogress是<p>...</p>
+  -> performUnitOfWork // 1. 循环体，返回下一工作单元，重复执行  2. 设置全局变量current为当前工作单元
+  -> beginwork   // 根据不同的workInProgress.tag，执行不同的方法
+  -> updateHostComponent  // 1. HostComponent 内置标签 2. 获取当前工作节点的nextChildren = workInProgress.pendingProps.children向下传参, 结果是一个列表 ['click times:', 0]
+  -> reconcileChildren   
+  -> mountChildFibers(ChildReconciler)  // 判断子节点类型newChild.$$typeof
+  -> reconcileChildrenArray  // newChild是一个列表，遍历创建各自对应的fiber节点以sibling引用，返回第一个字符串元素'click times:'对应的fiber节点返回, fiber不为空回到workLoop，重复执行performUnitOfWork
+  五次执行，workinprogress是'click times:'
+  -> performUnitOfWork // 1. 循环体，返回下一工作单元，重复执行  2. 设置全局变量current为当前工作单元 3. beginWork返回为空，进入completeUnitOfWork，merge effectlist,返回兄弟节点'0'作为下一工作单元
+  -> beginwork   // 根据不同的workInProgress.tag，执行不同的方法
+  -> updateHostText  // HostText
+  六次执行，workinprogress是‘0’
+  -> performUnitOfWork // 1. 循环体，返回下一工作单元，重复执行  2. 设置全局变量current为当前工作单元 3. beginWork返回为空，进入completeUnitOfWork，merge effectlist,返回button作为下一工作单元
+  -> beginwork   // 根据不同的workInProgress.tag，执行不同的方法
+  -> updateHostText  // HostText
+  七次执行，workinprogress是<button></button>
+  -> performUnitOfWork // 1. 循环体，返回下一工作单元，重复执行  2. 设置全局变量current为当前工作单元
+  -> beginwork   // 根据不同的workInProgress.tag，执行不同的方法
+  -> updateHostComponent  // 1. HostComponent 内置标签 2. 获取当前工作节点的nextChildren = workInProgress.pendingProps.children向下传参, 结果是'click me'
+  -> reconcileChildren   
+  -> mountChildFibers(ChildReconciler)  // 判断子节点类型newChild.$$typeof
+  -> reconcileSingleTextNode  // string 创建fiber节点返回
+  -> placeSingleChild  // 设置effecttag为插入 newFiber.effectTag = Placement，返回新fiber, fiber不为空回到workLoop，重复执行performUnitOfWork
+  八次执行，workinprogress是‘click me’
+  -> performUnitOfWork // 1. 循环体，返回下一工作单元，重复执行  2. 设置全局变量current为当前工作单元 3. beginWork返回为空，进入completeUnitOfWork，merge effectlist,返回空跳出循环
+  -> beginwork   // 根据不同的workInProgress.tag，执行不同的方法
+  -> updateHostText  // HostText
+
+  至此整个子树处理完成，回到renderRoot, onComplete将处理完成的容器fiber挂载到root.finishedWork
+  再回到performWorkOnRoot，进入commit
+  -> completeRoot
+  -> commitRoot  
+  // 1. 此时effectlist只包含容器fiber子树的所有effect，还要将容器fiber本身加入effectlist最后 
+  // 2. 遍历effectlist，getSnapshotBeforeUpdate 
+  // 3. 遍历effectlist，commitAllHostEffects
+  // 4. root.current = finishedWork
+  // 5. 遍历effectlist，commitAllLifeCycles
+  // 6. onCommitRoot
+
+
+  // merge effectlist
+  completeUnitOfWork(workinprogress){
+      while(true){
+          next = completeWork(workinprogress)
+          if(next){
+              return next
+          }
+          if(returnfiber){
+              merge effectlist
+          }
+          if(siblingFiber){
+              // If there is more work to do in this returnFiber, do that next.
+              return siblingFiber
+          }else if (returnFiber) {
+              // If there's no more work in this returnFiber. Complete the returnFiber.
+              workInProgress = returnFiber;
+              continue;
+            } else {
+                // We've reached the root.
+                return null;
+            }
+      }
+  }
+
+  触发某个组件更新会重新执行scheduleWork，将当前组件的fiber传参
+
+
+  -> useState
+  -> mountState
+  -> updateState
+  hook = {
+    memoizedState: null,
+
+    baseState: null,
+    queue: null,
+    baseUpdate: null,
+
+    next: null   // hook：usestate和useeffect
+  }
+  hook.queue = { // 闭环
+    last: null,  // update
+    dispatch: null,
+    lastRenderedReducer: basicStateReducer,
+    lastRenderedState: initialState
+  }
+  queue.dispatch = dispatchAction.bind(null, currentlyRenderingFiber$1, queue);
+  update = {
+      expirationTime: renderExpirationTime,
+      action: action,
+      eagerReducer: null,
+      eagerState: null,
+      next: null
+    }
+
+  -> useEffect
+  -> mountEffect
+  hook = {
+    memoizedState: null,  // effect，同updatequeue的effect对象相同
+
+    baseState: null,
+    queue: null,
+    baseUpdate: null,
+
+    next: null   // hook：usestate和useeffect
+  }
+  effect = {
+    tag: tag,
+    create: create,
+    destroy: destroy,
+    deps: deps,
+    // Circular
+    next: null
+  };
+  updatequeue = {
+      lastEffect: null   // effect, 闭环
+  }
+
+
+  
